@@ -1,0 +1,126 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: AWS Serverless Spring Boot 2 CRUD API
+Globals:
+  Function:
+    Runtime: java11
+    MemorySize: 1024
+    Timeout: 20
+    Environment:
+      Variables:
+        TABLE_NAME: !Ref CrudDBTable
+
+Resources:
+  CrudAPI:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: dev
+      Name: crud-api
+
+  CreateItemsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: com.wilkom.awscrudapi.handler.CreateItemHandler::handleRequest
+      CodeUri: .
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CrudDBTable
+        - AWSXrayWriteOnlyAccess
+      Tracing: Active
+      Events:
+        ProxyResource:
+          Type: Api
+          Properties:
+            Path: /items
+            Method: POST
+            RestApiId: !Ref CrudAPI
+
+  GetItemsFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: com.wilkom.awscrudapi.handler.GetItemsHandler::handleRequest
+      CodeUri: .
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CrudDBTable
+        - AWSXrayWriteOnlyAccess
+      Tracing: Active
+      Events:
+        ProxyResource:
+          Type: Api
+          Properties:
+            Path: /items
+            Method: GET
+            RestApiId: !Ref CrudAPI
+
+  FindItemFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: com.wilkom.awscrudapi.handler.FindItemHandler::handleRequest
+      CodeUri: .
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CrudDBTable
+        - AWSXrayWriteOnlyAccess
+      Tracing: Active
+      Events:
+        ProxyResource:
+          Type: Api
+          Properties:
+            Path: /items/{id}
+            Method: GET
+            RestApiId: !Ref CrudAPI
+
+  DeleteItemFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: com.wilkom.awscrudapi.handler.DeleteItemHandler::handleRequest
+      CodeUri: .
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CrudDBTable
+        - AWSXrayWriteOnlyAccess
+      Tracing: Active
+      Events:
+        ProxyResource:
+          Type: Api
+          Properties:
+            Path: /items/{id}
+            Method: DELETE
+            RestApiId: !Ref CrudAPI
+
+  UpdateItemFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: com.wilkom.awscrudapi.handler.UpdateItemHandler::handleRequest
+      CodeUri: .
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CrudDBTable
+        - AWSXrayWriteOnlyAccess
+      Tracing: Active
+      Events:
+        ProxyResource:
+          Type: Api
+          Properties:
+            Path: /items/{id}
+            Method: PUT
+            RestApiId: !Ref CrudAPI
+
+  CrudDBTable:
+    Type: AWS::Serverless::SimpleTable
+    Properties:
+      TableName: crud-table
+      ProvisionedThroughput:
+        WriteCapacityUnits: 5
+        ReadCapacityUnits: 5
+      PrimaryKey:
+        Name: id
+        Type: String
+
+Outputs:
+  CrudAPI:
+    Description: URL for application
+    Value: !Sub "https://${CrudAPI}.execute-api.${AWS::Region}.amazonaws.com/dev"
+    Export:
+      Name: CrudAPI
