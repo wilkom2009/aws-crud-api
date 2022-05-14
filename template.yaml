@@ -6,27 +6,87 @@ Globals:
     Runtime: java11
     MemorySize: 1024
     Timeout: 20
+    Tracing: Active
     Environment:
       Variables:
         TABLE_NAME: !Ref CrudDBTable
+        AWS_XRAY_TRACING_NAME: "CrudApiTracing"
 
 Resources:
+  # Creating Cognito UserPool
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: Crud-Cognito-User-Pool
+
+  # Creating COGNITO UserPoolClient which enables the OAuthFlowwith client_credentialsand allowing OAuthScopes for all CRUD endpoints
+  CognitoUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    DependsOn: CognitoDomainNameResourceServer
+    Properties:
+      UserPoolId: !Ref CognitoUserPool
+      ClientName: Crud-CognitoUserPoolClient
+      GenerateSecret: true
+      AllowedOAuthFlowsUserPoolClient: true
+      AllowedOAuthFlows:
+        - client_credentials
+      SupportedIdentityProviders:
+        - COGNITO
+      AllowedOAuthScopes:
+        - access_points/read
+        - access_points/delete
+        - access_points/update
+        - access_points/write
+
+  # Creating UserPoolDomain and mapped with CongitoUserPool
+  CognitoDomainName:
+    Type: AWS::Cognito::UserPoolDomain
+    Properties:
+      Domain: crud-domain
+      UserPoolId: !Ref CognitoUserPool
+
+  # Creating a UserpoolResourceServerwith all CRUD (create, read, update, delete) scopes.
+  CognitoDomainNameResourceServer:
+    Type: AWS::Cognito::UserPoolResourceServer
+    Properties:
+      Identifier: access_points
+      Name: !Sub Crud-resource-server
+      Scopes:
+        - ScopeDescription: "Read Resources"
+          ScopeName: "read"
+        - ScopeDescription: "Write Resources"
+          ScopeName: "write"
+        - ScopeDescription: "Delete Resources"
+          ScopeName: "delete"
+        - ScopeDescription: "Update Resources"
+          ScopeName: "update"
+      UserPoolId: !Ref CognitoUserPool
+
   CrudAPI:
     Type: AWS::Serverless::Api
     Properties:
       StageName: dev
       Name: crud-api
+      # Creating API-Gateway with CustomCognitoAuthorizerand read,writeauthorization scopes.
+      Auth:
+        DefaultAuthorizer: CustomCognitoAuthorizer
+        Authorizers:
+          CustomCognitoAuthorizer:
+            UserPoolArn: !GetAtt CognitoUserPool.Arn
+            AuthorizationScopes:
+              - access_points/read
+              - access_points/write
 
   CreateItemsFunction:
     Type: AWS::Serverless::Function
     Properties:
       Handler: com.wilkom.awscrudapi.handler.CreateItemHandler::handleRequest
       CodeUri: .
+      # Role: !GetAtt LambdaFunctionRole.Arn
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref CrudDBTable
         - AWSXrayWriteOnlyAccess
-      Tracing: Active
       Events:
         ProxyResource:
           Type: Api
@@ -40,11 +100,11 @@ Resources:
     Properties:
       Handler: com.wilkom.awscrudapi.handler.GetItemsHandler::handleRequest
       CodeUri: .
+      # Role: !GetAtt LambdaFunctionRole.Arn
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref CrudDBTable
         - AWSXrayWriteOnlyAccess
-      Tracing: Active
       Events:
         ProxyResource:
           Type: Api
@@ -58,11 +118,11 @@ Resources:
     Properties:
       Handler: com.wilkom.awscrudapi.handler.FindItemHandler::handleRequest
       CodeUri: .
+      # Role: !GetAtt LambdaFunctionRole.Arn
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref CrudDBTable
         - AWSXrayWriteOnlyAccess
-      Tracing: Active
       Events:
         ProxyResource:
           Type: Api
@@ -76,11 +136,11 @@ Resources:
     Properties:
       Handler: com.wilkom.awscrudapi.handler.DeleteItemHandler::handleRequest
       CodeUri: .
+      # Role: !GetAtt LambdaFunctionRole.Arn
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref CrudDBTable
         - AWSXrayWriteOnlyAccess
-      Tracing: Active
       Events:
         ProxyResource:
           Type: Api
@@ -94,11 +154,11 @@ Resources:
     Properties:
       Handler: com.wilkom.awscrudapi.handler.UpdateItemHandler::handleRequest
       CodeUri: .
+      # Role: !GetAtt LambdaFunctionRole.Arn
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref CrudDBTable
         - AWSXrayWriteOnlyAccess
-      Tracing: Active
       Events:
         ProxyResource:
           Type: Api
@@ -120,7 +180,8 @@ Resources:
 
 Outputs:
   CrudAPI:
-    Description: URL for application
-    Value: !Sub "https://${CrudAPI}.execute-api.${AWS::Region}.amazonaws.com/dev"
-    Export:
-      Name: CrudAPI
+    Description: "API Gateway endpoint URL"
+    Value: !Sub "https://${CrudAPI}.execute-api.${AWS::Region}.amazonaws.com/dev/"
+  CognitoDomainName:
+    Description: "CognitoDomainName URL"
+    Value: !Sub "https://${CognitoDomainName}.auth.${AWS::Region}.amazoncognito.com"
