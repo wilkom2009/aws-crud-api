@@ -5,7 +5,7 @@ This is a sample application to demonstrate how to build an application on Dynam
 
 ## Project Architecture
 
-<div style="text-align:center"><img src="./docs/architecture1.png" /></div>
+<div style="text-align:center"><img src="./docs/architecture.png" /></div>
 <br />
 
 ## Components
