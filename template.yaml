@@ -11,6 +11,8 @@ Globals:
       Variables:
         TABLE_NAME: !Ref CrudDBTable
         AWS_XRAY_TRACING_NAME: "CrudApiTracing"
+        SRC_BUCKET_NAME: "crud-items-api-src"
+        DEST_BUCKET_NAME: "crud-items-api-resized"
 
 Resources:
   # Creating Cognito UserPool
@@ -167,6 +169,29 @@ Resources:
             Method: PUT
             RestApiId: !Ref CrudAPI
 
+  SrcBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: crud-items-api-src
+
+  DestBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: crud-items-api-resized
+
+  CreateThumbnail:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: com.wilkom.awscrudapi.handler.CreateThumbnailHandler::handleRequest
+      CodeUri: .
+      Policies: AWSLambdaExecute
+      Events:
+        CreateThumbnailEvent:
+          Type: S3
+          Properties:
+            Bucket: !Ref SrcBucket
+            Events: s3:ObjectCreated:*
+
   CrudDBTable:
     Type: AWS::Serverless::SimpleTable
     Properties:
@@ -185,3 +210,6 @@ Outputs:
   CognitoDomainName:
     Description: "CognitoDomainName URL"
     Value: !Sub "https://${CognitoDomainName}.auth.${AWS::Region}.amazoncognito.com"
+  DestBucketArn:
+    Description: "Destination bucket ARN"
+    Value: !GetAtt DestBucket.Arn 

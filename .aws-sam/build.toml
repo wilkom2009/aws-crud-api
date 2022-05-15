@@ -8,6 +8,6 @@ architecture = "x86_64"
 handler = "com.wilkom.awscrudapi.handler.CreateItemHandler::handleRequest"
 manifest_hash = ""
 packagetype = "Zip"
-functions = ["CreateItemsFunction", "GetItemsFunction", "FindItemFunction", "DeleteItemFunction", "UpdateItemFunction"]
+functions = ["CreateItemsFunction", "GetItemsFunction", "FindItemFunction", "DeleteItemFunction", "UpdateItemFunction", "CreateThumbnail"]
 
 [layer_build_definitions]
