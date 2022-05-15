@@ -174,7 +174,9 @@ Resources:
             Path: /items/{id}
             Method: PUT
             RestApiId: !Ref CrudAPI
-
+  ################################################################################
+  #  Items raw images s3 bucket : images are deleted after 1 day
+  ################################################################################
   SrcBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -185,10 +187,77 @@ Resources:
             Status: Enabled
             ExpirationInDays: 1
 
+  ################################################################################
+  #  Thumbnail s3 bucket : make it private in order the be accessed by Cloudfront#
+  ################################################################################
   DestBucket:
     Type: AWS::S3::Bucket
+    Metadata:
+      Comment: "Bucket to store items thumbnail images"
     Properties:
       BucketName: !Sub "${BucketName}-resized"
+      AccessControl: "Private"
+
+  S3BucketPolicy:
+    Type: "AWS::S3::BucketPolicy"
+    Metadata:
+      Comment: "Bucket policy to allow cloudfront to access the thumbnail images"
+    Properties:
+      Bucket: !Ref DestBucket
+      PolicyDocument:
+        Statement:
+          - Action:
+              - "s3:GetObject"
+            Effect: "Allow"
+            Principal:
+              CanonicalUser: !GetAtt CfOriginAccessIdentity.S3CanonicalUserId
+            Resource:
+              - !Sub "arn:aws:s3:::${DestBucket}/*"
+
+  CfDistribution:
+    Type: "AWS::CloudFront::Distribution"
+    Metadata:
+      Comment: "A simple CloudFront distribution with an S3 origin"
+    Properties:
+      DistributionConfig:
+        Comment: "A simple distribution with an S3 origin"
+        DefaultCacheBehavior:
+          AllowedMethods:
+            - "HEAD"
+            - "GET"
+          CachedMethods:
+            - "HEAD"
+            - "GET"
+          Compress: false
+          DefaultTTL: 86400
+          ForwardedValues:
+            Cookies:
+              Forward: "none"
+            Headers:
+              - "Origin"
+            QueryString: false
+          MaxTTL: 31536000
+          MinTTL: 86400
+          TargetOriginId: !Sub "s3-origin-${DestBucket}"
+          ViewerProtocolPolicy: "redirect-to-https"
+        Enabled: true
+        HttpVersion: "http1.1"
+        IPV6Enabled: false
+        Origins:
+          - DomainName: !GetAtt DestBucket.DomainName
+            Id: !Sub "s3-origin-${DestBucket}"
+            OriginPath: ""
+            S3OriginConfig:
+              OriginAccessIdentity: !Sub "origin-access-identity/cloudfront/${CfOriginAccessIdentity}"
+        PriceClass: "PriceClass_All"
+
+  CfOriginAccessIdentity:
+    Type: "AWS::CloudFront::CloudFrontOriginAccessIdentity"
+    Metadata:
+      Comment: "Access S3 bucket content only through CloudFront"
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: "Access S3 bucket content only through CloudFront"
 
   CreateThumbnail:
     Type: AWS::Serverless::Function
@@ -221,6 +290,21 @@ Outputs:
   CognitoDomainName:
     Description: "CognitoDomainName URL"
     Value: !Sub "https://${CognitoDomainName}.auth.${AWS::Region}.amazoncognito.com"
+  SrcBucketArn:
+    Description: "Source bucket ARN"
+    Value: !GetAtt SrcBucket.Arn
+  SrcBucketDomainName:
+    Description: "Source bucket ARN"
+    Value: !GetAtt SrcBucket.DomainName
   DestBucketArn:
     Description: "Destination bucket ARN"
-    Value: !GetAtt DestBucket.Arn 
+    Value: !GetAtt DestBucket.Arn
+  DestBucketDomainName:
+    Description: "Destination bucket ARN"
+    Value: !GetAtt DestBucket.DomainName
+  CfDistributionId:
+    Description: "Id for our cloudfront distribution"
+    Value: !Ref CfDistribution
+  CfDistributionDomainName:
+    Description: "Domain name for our cloudfront distribution"
+    Value: !GetAtt CfDistribution.DomainName
