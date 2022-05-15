@@ -11,8 +11,14 @@ Globals:
       Variables:
         TABLE_NAME: !Ref CrudDBTable
         AWS_XRAY_TRACING_NAME: "CrudApiTracing"
-        SRC_BUCKET_NAME: "crud-items-api-src"
-        DEST_BUCKET_NAME: "crud-items-api-resized"
+        SRC_BUCKET_NAME: !Ref BucketName
+        DEST_BUCKET_NAME: !Sub "${BucketName}-resized"
+
+Parameters:
+  BucketName:
+    Type: String
+    Description: Name of the bucket on which lifecycle configuration will apply
+    Default: crud-items-api-images-bucket
 
 Resources:
   # Creating Cognito UserPool
@@ -172,12 +178,17 @@ Resources:
   SrcBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: crud-items-api-src
+      BucketName: !Ref BucketName
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteRawFileRule
+            Status: Enabled
+            ExpirationInDays: 1
 
   DestBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: crud-items-api-resized
+      BucketName: !Sub "${BucketName}-resized"
 
   CreateThumbnail:
     Type: AWS::Serverless::Function
